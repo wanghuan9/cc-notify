@@ -13,7 +13,7 @@ NC='\033[0m'
 info()  { echo -e "${BLUE}[INFO]${NC} $1"; }
 ok()    { echo -e "${GREEN}[OK]${NC} $1"; }
 
-INSTALL_DIR="$HOME/.claude/claude-notify"
+INSTALL_DIR="$HOME/.claude/cc-notify"
 SETTINGS_FILE="$HOME/.claude/settings.json"
 
 # 1. 删除安装目录
@@ -32,7 +32,7 @@ with open('$SETTINGS_FILE') as f:
     cfg = json.load(f)
 hooks = cfg.get('hooks', {})
 stop = hooks.get('Stop', [])
-stop = [h for h in stop if not any('claude-notify' in hh.get('command', '') for hh in h.get('hooks', []))]
+stop = [h for h in stop if not any('cc-notify' in hh.get('command', '') for hh in h.get('hooks', []))]
 if stop:
     hooks['Stop'] = stop
 else:
