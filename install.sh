@@ -225,25 +225,50 @@ info "配置 Claude Code hooks..."
 
 HOOK_CMD='python3 $HOME/.claude/cc-notify/notify.py'
 
-# 检查 settings.json 中是否已有 notify.py 相关的 hook
-_hook_exists() {
-    [[ -f "$SETTINGS_FILE" ]] && python3 -c "
-import json, sys
+# 检查并更新 settings.json 中的 notify.py hook
+_update_hook() {
+    python3 -c "
+import json
 with open('$SETTINGS_FILE') as f:
     cfg = json.load(f)
-for h in cfg.get('hooks', {}).get('Stop', []):
+
+# 查找并更新 notify.py hook
+updated = False
+hooks = cfg.get('hooks', {}).get('Stop', [])
+for h in hooks:
     for hh in h.get('hooks', []):
-        if 'notify.py' in hh.get('command', ''):
-            sys.exit(0)
-sys.exit(1)
+        cmd = hh.get('command', '')
+        if 'notify.py' in cmd:
+            # 更新旧路径
+            if 'claude-notify' in cmd:
+                hh['command'] = '$HOOK_CMD'
+                updated = True
+            # 检查是否已经是正确路径
+            elif cmd == '$HOOK_CMD':
+                updated = 'exists'
+
+# 写回文件
+with open('$SETTINGS_FILE', 'w') as f:
+    json.dump(cfg, f, indent=2, ensure_ascii=False)
+
+# 返回状态
+if updated == 'exists':
+    print('exists')
+elif updated:
+    print('updated')
+else:
+    print('not_found')
 " 2>/dev/null
 }
 
-if _hook_exists; then
-    ok "hooks 已存在，跳过配置"
-else
-    if [[ -f "$SETTINGS_FILE" ]]; then
-        # 合并 hooks 到已有配置
+if [[ -f "$SETTINGS_FILE" ]]; then
+    result=$(_update_hook)
+    if [[ "$result" == "exists" ]]; then
+        ok "hooks 路径正确，无需修改"
+    elif [[ "$result" == "updated" ]]; then
+        ok "hooks 路径已更新为 $HOOK_CMD"
+    else
+        # 没有找到 notify.py hook，添加新的
         python3 -c "
 import json
 with open('$SETTINGS_FILE') as f:
@@ -260,9 +285,10 @@ with open('$SETTINGS_FILE', 'w') as f:
     json.dump(cfg, f, indent=2, ensure_ascii=False)
 "
         ok "hooks 已写入 $SETTINGS_FILE"
-    else
-        # 创建新的 settings.json
-        python3 -c "
+    fi
+else
+    # 创建新的 settings.json
+    python3 -c "
 import json
 cfg = {
     'hooks': {
@@ -277,8 +303,7 @@ cfg = {
 with open('$SETTINGS_FILE', 'w') as f:
     json.dump(cfg, f, indent=2, ensure_ascii=False)
 "
-        ok "已创建 $SETTINGS_FILE"
-    fi
+    ok "已创建 $SETTINGS_FILE"
 fi
 
 # ============================================================
@@ -309,7 +334,7 @@ echo "  通知内容: \"任务已完成\""
 echo ""
 echo "  新开一个 Claude Code 会话即可生效。"
 echo ""
-echo -e "  ${CYAN}重新安装：${NC}"
+echo -e "  ${BLUE}重新安装：${NC}"
 echo "  cd ~/.claude/cc-notify && bash install.sh"
 echo ""
 echo -e "  ${YELLOW}提示: 如果没看到测试通知，请到${NC}"
